@@ -1,23 +1,81 @@
-from django.shortcuts import render, redirect, get_object_or_404
+from datetime import date
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.forms import UserCreationForm, AuthenticationForm, PasswordChangeForm
+from django.contrib.auth import update_session_auth_hash
 from .models import Task
 
-def daily_tasks_home(request):
-    # Notice the '.filter(is_completed=False)' - this ensures finished tasks disappear from the list!
-    daily_tasks = Task.objects.filter(task_type='DAILY', is_completed=False)
+# ==========================================
+# AUTHENTICATION VIEWS
+# ==========================================
+def custom_login(request):
+    if request.user.is_authenticated:
+        return redirect('/')
     
+    if request.method == 'POST':
+        form = AuthenticationForm(request, data=request.POST)
+        if form.is_valid():
+            user = form.get_user()
+            login(request, user)
+            return redirect('/')
+    else:
+        form = AuthenticationForm()
+    return render(request, 'tasks/login.html', {'form': form})
+
+def custom_register(request):
+    if request.user.is_authenticated:
+        return redirect('/')
+        
+    if request.method == 'POST':
+        form = UserCreationForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            return redirect('/')
+    else:
+        form = UserCreationForm()
+    return render(request, 'tasks/register.html', {'form': form})
+
+def custom_logout(request):
+    logout(request)
+    return redirect('login')
+
+# ==========================================
+# APP VIEWS
+# ==========================================
+@login_required(login_url='/login/')
+def daily_tasks_home(request):
+    today = date.today()
+    # FIX: Changed 'completed=False' to 'is_completed=False' to match your model
+    # FIX: Changed 'due_date' to 'deadline' based on the traceback choices
+    all_tasks = Task.objects.filter(user=request.user, is_completed=False)
+
     context = {
-        'tasks': daily_tasks
+        'overdue': all_tasks.filter(deadline__lt=today),
+        'today': all_tasks.filter(deadline=today),
+        'upcoming': all_tasks.filter(deadline__gt=today),
     }
     return render(request, 'tasks/home.html', context)
 
-def complete_task(request, task_id):
-    # 1. Grab the specific task by its ID
-    task = get_object_or_404(Task, id=task_id)
+@login_required(login_url='/login/')
+def settings_view(request):
+    password_form = PasswordChangeForm(request.user)
+    msg = None
     
-    # 2. If someone clicks the button (which sends a POST request), mark it done
     if request.method == 'POST':
-        task.is_completed = True
-        task.save()
-        
-    # 3. Refresh the home page instantly so the task disappears
-    return redirect('home')
+        if 'update_username' in request.POST:
+            new_username = request.POST.get('new_username')
+            if new_username:
+                request.user.username = new_username
+                request.user.save()
+                msg = "Username updated successfully!"
+                
+        elif 'update_password' in request.POST:
+            password_form = PasswordChangeForm(request.user, request.POST)
+            if password_form.is_valid():
+                user = password_form.save()
+                update_session_auth_hash(request, user)
+                msg = "Password updated successfully!"
+                
+    return render(request, 'tasks/settings.html', {'password_form': password_form, 'msg': msg})
