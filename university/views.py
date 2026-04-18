@@ -1,6 +1,12 @@
 from django.shortcuts import render
 from .models import Course, CalendarEvent
 from django.db.models import Sum
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
+
+@login_required(login_url='/login/')
+def university_home(request):
+    return render(request, 'university/home.html')
 
 def university_home(request):
     courses = Course.objects.all()
