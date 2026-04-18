@@ -1,14 +1,18 @@
 from django.contrib import admin
 from django.urls import path, include
-from tasks.views import daily_tasks_home, complete_task  # <-- Added complete_task here
+from tasks.views import custom_login, custom_register, custom_logout
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', daily_tasks_home, name='home'), 
     
-    # This URL captures the specific ID of the task you want to complete
-    path('complete/<int:task_id>/', complete_task, name='complete_task'),
+    # Your Custom Authentication Gates
+    path('login/', custom_login, name='login'),
+    path('register/', custom_register, name='register'),
+    path('logout/', custom_logout, name='logout'),
     
+    # Your Apps
+    path('', include('tasks.urls')),
+    path('finance/', include('finance.urls')),
     path('university/', include('university.urls')),
-    path('finance/', include('finance.urls')), 
+    path('automations/', include('automations.urls')),
 ]
